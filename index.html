@@ -1,4 +1,4 @@
-<!-- START OF FILE mi_paint_fixed_v18.html -->
+<!-- START OF FILE mi_paint_fixed_v20.html -->
 
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -1059,7 +1059,8 @@
             lassoPath: null, lassoItems: [], lassoState: 'idle', lassoPrevPoint: null, lassoBackup: null,
             activePointers: new Map(), isGesturing: false, prevDist: 0, prevC: null,
             laserTrails: [], activeLaserTrail: null, lastLaserActivity: 0,
-            isTempPanning: false 
+            isTempPanning: false,
+            backupLayerJSON: null // [FIX] Store state before erase starts
         };
         
         const ToolSettings = {
@@ -1391,7 +1392,11 @@
             
             if (App.activePointers.size === 1 && !App.isGesturing) { 
                 if (App.mode === 'pen') startPenStroke(p, pressure); 
-                else if (App.mode === 'eraser') eraseAt(p); 
+                else if (App.mode === 'eraser') {
+                    // [FIX] Save state BEFORE we destroy it
+                    App.backupLayerJSON = getCleanStateJSON();
+                    eraseAt(p); 
+                }
                 else if (App.mode === 'eraser-rect') startRectEraser(p); 
                 else if (App.mode === 'lasso') handleLassoDown(p); 
                 else if (App.mode === 'laser') { 
@@ -1487,6 +1492,9 @@
                 if (App.lassoState === 'selected') updateLassoMenu();
                 return;
             }
+            
+            // [FIX] Clear backup state as gesture didn't happen
+            App.backupLayerJSON = null;
 
             if (App.mode === 'pen' && App.currentPath) finalizeStroke(); 
             else if (App.mode === 'eraser') { if (App.eraserPreview) { App.eraserPreview.remove(); App.eraserPreview = null; } History.saveState(); } 
@@ -1753,6 +1761,19 @@
         function startGesture() { 
             App.isGesturing = true; 
             if(App.currentPath){App.currentPath.remove();App.currentPath=null;} 
+            
+            // Cleanup Eraser UI
+            if(App.eraserPreview) { App.eraserPreview.remove(); App.eraserPreview = null; }
+            if(App.rectPath) { App.rectPath.remove(); App.rectPath = null; }
+
+            // [FIX] REVERT ERASER DAMAGE IF GESTURE STARTED
+            if (App.mode === 'eraser' && App.backupLayerJSON) {
+                const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer;
+                paintLayer.removeChildren();
+                paintLayer.importJSON(App.backupLayerJSON);
+                App.backupLayerJSON = null;
+            }
+
             const p=Array.from(App.activePointers.values()); 
             App.prevDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); 
             App.prevC={x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2};
