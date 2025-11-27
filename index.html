@@ -1,11 +1,12 @@
-<!-- START OF FILE mi_paint_fixed_v20.html -->
+
+<!-- START OF FILE mi_paint_fixed_v21_gpu.html -->
 
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小米白板</title>
+    <title>小米白板 (GPU加速版)</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.17/paper-full.min.js"></script>
@@ -65,7 +66,19 @@
         .fab-add:active { transform: scale(0.95); }
 
         /* --- Editor --- */
-        #canvas { width: 100vw; height: 100vh; display: block; cursor: crosshair; }
+        #canvas { 
+            width: 100vw; 
+            height: 100vh; 
+            display: block; 
+            cursor: crosshair;
+            
+            /* [GPU 效能優化] 
+               這會將 canvas 提升到獨立的合成層，
+               在移動和縮放時使用 GPU 而非 CPU 重繪 */
+            transform: translate3d(0, 0, 0); 
+            will-change: transform;
+            backface-visibility: hidden;
+        }
         
         .editor-header-bar {
             position: absolute; top: 0; left: 0; right: 0; height: 40px; z-index: 101; 
@@ -437,7 +450,8 @@
             <button class="action-btn text-red-400" id="lasso-del" style="color:#FCA5A5"><i data-lucide="trash" size="14"></i> 刪除</button>
         </div>
 
-        <canvas id="canvas" resize></canvas>
+        <!-- [GPU 效能優化] 加入 desynchronized 減少輸入延遲 -->
+        <canvas id="canvas" resize desynchronized="true"></canvas>
     </div>
 
     <script type="module">
@@ -1151,6 +1165,12 @@
         window.onload = function() {
             lucide.createIcons();
             paper.setup('canvas');
+            
+            // [GPU 效能優化] 禁用自動矩陣應用
+            // 當此設為 false 時，縮放和移動群組不會重新計算每個子項目的點，
+            // 而是直接改變變換矩陣，大幅減少 CPU 計算量。
+            paper.settings.applyMatrix = false;
+
             ToolSettings.load(); 
             initColorPicker();
             initEvents();
