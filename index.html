@@ -1,16 +1,17 @@
 
-<!-- START OF FILE mi_paint_fixed_v21_gpu.html -->
+<!-- START OF FILE mi_paint_fixed_v28_final.html -->
 
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小米白板 (GPU加速版)</title>
+    <title>小米白板</title>
     
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.17/paper-full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script type="module">
         import { getStroke } from 'https://esm.sh/perfect-freehand';
@@ -43,6 +44,16 @@
         /* Cursor Styles */
         body.cursor-hand #canvas { cursor: grab; }
         body.cursor-hand-grabbing #canvas { cursor: grabbing; }
+        
+        #canvas { 
+            width: 100vw; 
+            height: 100vh; 
+            display: block; 
+            cursor: crosshair;
+            transform: translate3d(0, 0, 0); 
+            will-change: transform;
+            backface-visibility: hidden;
+        }
 
         /* --- Home --- */
         .home-header { padding: 24px; display: flex; align-items: center; justify-content: space-between; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -65,21 +76,7 @@
         .fab-add:hover { transform: scale(1.05); background: #1D4ED8; }
         .fab-add:active { transform: scale(0.95); }
 
-        /* --- Editor --- */
-        #canvas { 
-            width: 100vw; 
-            height: 100vh; 
-            display: block; 
-            cursor: crosshair;
-            
-            /* [GPU 效能優化] 
-               這會將 canvas 提升到獨立的合成層，
-               在移動和縮放時使用 GPU 而非 CPU 重繪 */
-            transform: translate3d(0, 0, 0); 
-            will-change: transform;
-            backface-visibility: hidden;
-        }
-        
+        /* --- Editor UI --- */
         .editor-header-bar {
             position: absolute; top: 0; left: 0; right: 0; height: 40px; z-index: 101; 
             pointer-events: auto; background: rgba(255,255,255,0.95); 
@@ -92,7 +89,6 @@
         .nav-btn svg { width: 18px; height: 18px; }
         .nav-title-display { font-size: 14px; font-weight: 600; color: #334155; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; pointer-events: none; user-select: none; }
         
-        /* --- Tools --- */
         .ui-top-center { position: absolute; top: 48px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; z-index: 100; width: fit-content; max-width: 96%; pointer-events: none; transition: top 0.3s ease; }
         .panel { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 4px; display: flex; flex-wrap: nowrap; align-items: center; justify-content: center; gap: 4px; pointer-events: auto; border: 1px solid rgba(0,0,0,0.05); }
         .btn { width: 44px; height: 44px; border-radius: 10px; border: none; display: flex; align-items: center; justify-content: center; cursor: pointer; background: transparent; color: #64748B; transition: all 0.2s; flex-shrink: 0; padding: 0; }
@@ -113,7 +109,6 @@
         .slider-group .setting-item { margin: 4px 6px; }
         input[type="range"] { width: 80px; accent-color: #2563EB; cursor: pointer; }
 
-        /* Zoom Indicator */
         #zoom-indicator {
             position: fixed; bottom: 20px; right: 20px;
             background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(4px);
@@ -123,75 +118,41 @@
             opacity: 0; transition: opacity 0.3s;
         }
 
-        @media (max-width: 600px) {
-            .nav-title-display { font-size: 13px; }
-            .header-center { left: 40px; right: 40px; }
-            .ui-top-center { top: 46px; width: 100%; padding: 0 4px; box-sizing: border-box; }
-            .main-tools { flex-wrap: nowrap; width: 100%; overflow-x: auto; justify-content: space-between; gap: 2px; padding: 4px 6px; }
-            .main-tools .btn { flex-shrink: 1; width: 11vw; height: 11vw; max-width: 40px; max-height: 40px; min-width: 32px; min-height: 32px; }
-            .main-tools .btn svg { width: 65%; height: 65%; }
-        }
-        @media (max-width: 320px) { .header-center { display: none; } }
-
-        /* --- 彈窗通用 --- */
+        /* --- 彈窗 --- */
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 998; display: none; justify-content: center; align-items: center; backdrop-filter: blur(2px); }
         .modal-content { background: white; width: 340px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); border-radius: 20px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); z-index: 999; font-size: 14px; color: #334155; overflow-y: auto; display: flex; flex-direction: column; box-sizing: border-box; }
         .modal-title { font-size: 18px; font-weight: bold; margin-bottom: 16px; color: #0F172A; display:flex; justify-content:space-between; align-items:center; }
         .dialog-msg { font-size: 15px; color: #475569; margin-bottom: 24px; line-height: 1.5; }
         .dialog-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 16px; }
-        
         .btn-text { padding: 8px 16px; font-weight: 600; color: #64748B; background: transparent; border: none; border-radius: 8px; cursor: pointer; width: auto; height: auto; display: inline-flex; transition: 0.2s; }
         .btn-text:hover { background: #F1F5F9; color: #334155; }
-        
         .btn-primary { background: #2563EB; color: white; }
         .btn-primary:hover { background: #1D4ED8; color: white; }
-
-        /* [確認鈕樣式] 紅底白字 */
         .btn-danger-solid { background: #EF4444; color: white; padding: 8px 20px; border-radius: 8px; font-weight: 600; border: none; cursor: pointer; transition: 0.2s; }
         .btn-danger-solid:hover { background: #DC2626; }
-        .btn-danger-solid:active { transform: scale(0.98); }
-
         .modal-row { margin-bottom: 16px; }
         .modal-label { display: block; margin-bottom: 6px; font-weight: 500; }
         .modal-select, .modal-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #CBD5E1; background: #F8FAFC; color: #334155; box-sizing: border-box; font-size: 14px; }
-        .modal-input:focus, .modal-select:focus { outline: 2px solid #BFDBFE; border-color: #2563EB; }
-
-        /* 隱藏元素 */
         .hidden { display: none !important; }
 
-        /* 新增畫布彈窗特定樣式 */
+        .export-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .export-option { border: 2px solid #E2E8F0; border-radius: 12px; padding: 12px; text-align: center; cursor: pointer; transition: 0.2s; color: #64748B; font-weight: 500; }
+        .export-option:hover { border-color: #94A3B8; background: #F8FAFC; }
+        .export-option.selected { border-color: #2563EB; background: #EFF6FF; color: #2563EB; }
+
         .bg-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 8px; }
-        .bg-option { 
-            border: 2px solid #E2E8F0; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; 
-        }
-        .bg-option:hover { border-color: #94A3B8; }
+        .bg-option { border: 2px solid #E2E8F0; border-radius: 8px; padding: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
         .bg-option.selected { border-color: #2563EB; background: #EFF6FF; }
         .bg-preview { width: 24px; height: 24px; border-radius: 4px; border: 1px solid rgba(0,0,0,0.1); position:relative; overflow:hidden;}
+        .bg-option[data-bg="grid-white"] .bg-preview { background-color: white; background-image: linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px); background-size: 8px 8px; }
+        .bg-option[data-bg="grid-beige"] .bg-preview { background-color: #FFF8E1; background-image: linear-gradient(#d4c5a9 1px, transparent 1px), linear-gradient(90deg, #d4c5a9 1px, transparent 1px); background-size: 8px 8px; }
         
-        .bg-option[data-bg="grid-white"] .bg-preview {
-            background-color: white;
-            background-image: linear-gradient(#cbd5e1 1px, transparent 1px), linear-gradient(90deg, #cbd5e1 1px, transparent 1px);
-            background-size: 8px 8px;
-        }
-        .bg-option[data-bg="grid-beige"] .bg-preview {
-            background-color: #FFF8E1;
-            background-image: linear-gradient(#d4c5a9 1px, transparent 1px), linear-gradient(90deg, #d4c5a9 1px, transparent 1px);
-            background-size: 8px 8px;
-        }
-
         .custom-size-row { display: flex; gap: 10px; }
-
-        /* 頁面管理列表 */
         .page-list-item { display: flex; align-items: center; justify-content: space-between; padding: 8px; border-bottom: 1px solid #F1F5F9; cursor: pointer; transition: 0.1s; border-radius: 8px; background: white; margin-bottom: 4px; user-select: none; }
-        .page-list-item:hover { background: #F8FAFC; }
-        .page-list-item.active { background: #EFF6FF; color: #2563EB; font-weight: 600; }
         .page-list-item.dragging { opacity: 0.4; background: #E2E8F0; border: 1px dashed #94A3B8; }
-        
         .page-info-group { display: flex; align-items: center; gap: 8px; flex: 1; pointer-events: none; }
         .drag-handle { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; cursor: grab; color: #CBD5E1; border-radius: 4px; flex-shrink: 0; pointer-events: auto; }
-        .drag-handle:hover { color: #64748B; background: #F1F5F9; }
-        .drag-handle:active { cursor: grabbing; }
-
+        
         .toggle-switch { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
         .toggle-track { width: 44px; height: 24px; background: #E2E8F0; border-radius: 12px; position: relative; transition: 0.2s; }
         .toggle-thumb { width: 20px; height: 20px; background: white; border-radius: 50%; position: absolute; top: 2px; left: 2px; transition: 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
@@ -203,15 +164,12 @@
         .color-trigger:active { transform: scale(0.9); }
         #color-popover { position: absolute; top: 140px; left: 50%; transform: translateX(-50%); background: white; padding: 16px; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.15); z-index: 200; display: none; flex-direction: column; align-items: center; border: 1px solid rgba(0,0,0,0.05); }
         #color-popover.visible { display: flex; animation: fadeIn 0.2s; }
-
-        #lasso-actions { 
-            position: absolute; display: none; background: #1E293B; padding: 6px; border-radius: 10px; gap: 8px; z-index: 200; 
-            transform: translate(-50%, -100%); margin-top: -15px;
-            white-space: nowrap; 
-        }
+        
+        #lasso-actions { position: absolute; display: none; background: #1E293B; padding: 6px; border-radius: 10px; gap: 8px; z-index: 200; transform: translate(-50%, -100%); margin-top: -15px; white-space: nowrap; }
         #lasso-actions.visible { display: flex; animation: popIn 0.2s; }
         .action-btn { color: white; background: transparent; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 4px; font-size: 13px; }
         .action-btn:hover { background: rgba(255,255,255,0.15); }
+        
         @keyframes popIn { from { transform: translate(-50%, -90%) scale(0.9); opacity: 0; } to { opacity: 1; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateX(-50%) translateY(10px); } to { opacity: 1; } }
         #loading { position: fixed; inset:0; background:white; z-index:9999; display:flex; justify-content:center; align-items:center; transition: opacity 0.5s; flex-direction: column; gap:12px; color:#64748B; font-weight:500;}
@@ -249,11 +207,43 @@
                 <button class="btn" id="close-pages-modal" style="width:32px;height:32px"><i data-lucide="x"></i></button>
             </div>
             <div style="font-size:12px; color:#94A3B8; margin-bottom:8px;">長按左側把手拖曳可排序</div>
-            <div id="pages-list-container">
-                <!-- 頁面列表 -->
-            </div>
+            <div id="pages-list-container"></div>
             <div class="dialog-actions">
                 <button class="btn-text btn-primary" id="btn-add-page-modal" style="width:100%"><i data-lucide="plus" style="width:16px; margin-right:4px;"></i> 新增頁面</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯出對話框 -->
+    <div class="modal-overlay" id="export-modal">
+        <div class="modal-content">
+            <div class="modal-title">
+                <span>匯出畫布</span>
+                <button class="btn" id="close-export" style="width:32px;height:32px"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-row">
+                <span class="modal-label">選擇格式</span>
+                <div class="export-grid">
+                    <div class="export-option selected" data-fmt="png">PNG 圖片</div>
+                    <div class="export-option" data-fmt="jpg">JPG 圖片</div>
+                    <div class="export-option" data-fmt="svg">SVG 向量</div>
+                    <div class="export-option" data-fmt="pdf">PDF 文件</div>
+                </div>
+            </div>
+            
+            <div class="modal-row" id="export-padding-config">
+                <span class="modal-label">邊緣留白 (px)</span>
+                <input type="number" id="export-padding" class="modal-input" value="50">
+                <div style="font-size:12px; color:#94A3B8; margin-top:4px;">僅適用於無限畫布，避免內容貼邊。</div>
+            </div>
+
+            <div style="font-size:12px; color:#94A3B8; margin-bottom:20px; line-height:1.5;">
+                • 有限畫布：將按頁面分別匯出圖片，或合併為多頁 PDF。<br>
+                • 無限畫布：將自動裁切至內容範圍並加上留白。
+            </div>
+            <div class="dialog-actions">
+                <button class="btn-text" id="btn-cancel-export">取消</button>
+                <button class="btn-text btn-primary" id="btn-confirm-export"><i data-lucide="download" style="width:16px; margin-right:4px;"></i> 下載</button>
             </div>
         </div>
     </div>
@@ -279,7 +269,6 @@
                 </select>
             </div>
 
-            <!-- 自訂尺寸輸入區 -->
             <div class="modal-row hidden" id="custom-size-inputs">
                 <div class="custom-size-row">
                     <div>
@@ -340,13 +329,12 @@
                 <div id="canvas-title-display" class="nav-title-display">未命名畫布</div>
             </div>
             <div class="header-right">
-                <!-- 頁面管理區塊，僅在有限畫布顯示 -->
                 <div id="page-controls" class="hidden" style="display:flex; align-items:center; gap:4px;">
                     <button class="nav-btn" id="btn-add-page" title="新增頁面"><i data-lucide="file-plus-2"></i></button>
                     <button class="nav-btn" id="btn-pages" title="頁面管理"><i data-lucide="layers"></i></button>
                     <div style="width:1px; height:20px; background:#E2E8F0; margin:0 4px;"></div>
                 </div>
-                
+                <button class="nav-btn" id="btn-export" title="匯出"><i data-lucide="download"></i></button>
                 <button class="nav-btn" id="btn-settings" title="設定"><i data-lucide="settings"></i></button>
             </div>
         </div>
@@ -405,42 +393,6 @@
                         <option value="none">無變化 (固定粗細)</option>
                     </select>
                 </div>
-                <hr class="modal-divider">
-                <div style="font-weight:bold; color:#64748B; margin-bottom:12px;">Redmi靈感觸控筆按鍵</div>
-                <div class="modal-row">
-                    <span class="modal-label">速記鍵(下鍵)</span>
-                    <select class="modal-select" id="btn-34-action">
-                        <option value="none">無功能 (預設)</option>
-                        <option value="toggle-eraser">切換橡皮擦/畫筆</option>
-                        <option value="toggle-laser">切換雷射筆/畫筆</option>
-                        <option value="toggle-lasso">切換索套/畫筆</option>
-                        <option value="undo">復原</option>
-                        <option value="redo">重做</option>
-                    </select>
-                </div>
-                <div class="modal-row">
-                    <span class="modal-label">截圖鍵(上鍵)</span>
-                    <select class="modal-select" id="btn-33-action">
-                        <option value="none">無功能 (預設)</option>
-                        <option value="toggle-lasso">切換索套/畫筆</option>
-                        <option value="toggle-laser">切換雷射筆/畫筆</option>
-                        <option value="toggle-eraser">切換橡皮擦/畫筆</option>
-                        <option value="undo">復原</option>
-                        <option value="redo">重做</option>
-                    </select>
-                </div>
-                <hr class="modal-divider">
-                <div style="font-weight:bold; color:#64748B; margin-bottom:12px;">快速鍵說明</div>
-                <div style="font-size:12px; color:#64748B; line-height: 1.8;">
-                    <b>H</b> : 抓手工具<br>
-                    <b>B / P</b> : 畫筆<br>
-                    <b>E</b> : 橡皮擦<br>
-                    <b>R</b> : 方框擦除<br>
-                    <b>L / S</b> : 索套工具<br>
-                    <b>Z</b> : 雷射筆<br>
-                    <b>Ctrl+Z</b> : 復原<br>
-                    <b>Ctrl+Y</b> : 重做
-                </div>
             </div>
         </div>
 
@@ -450,7 +402,6 @@
             <button class="action-btn text-red-400" id="lasso-del" style="color:#FCA5A5"><i data-lucide="trash" size="14"></i> 刪除</button>
         </div>
 
-        <!-- [GPU 效能優化] 加入 desynchronized 減少輸入延遲 -->
         <canvas id="canvas" resize desynchronized="true"></canvas>
     </div>
 
@@ -458,8 +409,9 @@
         import { getStroke } from 'https://esm.sh/perfect-freehand';
         paper.install(window);
 
-        const PAGE_GAP = 50; // 頁面間距
+        const PAGE_GAP = 50; 
 
+        // --- Dialog & Toast ---
         const Dialog = {
             overlay: document.getElementById('global-dialog'),
             titleEl: document.getElementById('dialog-title'),
@@ -498,6 +450,223 @@
             }
         };
 
+        // --- Export Manager (Final Fix: Translate to Origin) ---
+        const ExportManager = {
+            init() {
+                const modal = document.getElementById('export-modal');
+                const btn = document.getElementById('btn-export');
+                const closeBtn = document.getElementById('close-export');
+                const cancelBtn = document.getElementById('btn-cancel-export');
+                const confirmBtn = document.getElementById('btn-confirm-export');
+                const opts = document.querySelectorAll('.export-option');
+                const paddingRow = document.getElementById('export-padding-config');
+
+                btn.onclick = () => {
+                    if (AppManager.currentConfig.width) paddingRow.classList.add('hidden');
+                    else paddingRow.classList.remove('hidden');
+                    modal.style.display = 'flex';
+                };
+                closeBtn.onclick = cancelBtn.onclick = () => modal.style.display = 'none';
+                modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
+
+                opts.forEach(o => {
+                    o.onclick = () => {
+                        opts.forEach(opt => opt.classList.remove('selected'));
+                        o.classList.add('selected');
+                    };
+                });
+
+                confirmBtn.onclick = async () => {
+                    const fmt = document.querySelector('.export-option.selected').dataset.fmt;
+                    await this.performExport(fmt);
+                    modal.style.display = 'none';
+                };
+            },
+
+            // Create background at (0,0) with correct grid phase relative to original Y
+            createExportBackground(width, height, originalY) {
+                const group = new Group();
+                const config = AppManager.currentConfig;
+                
+                let fillColor = '#FFFFFF';
+                if (config.bgType.includes('beige')) fillColor = '#FFF8E1';
+                const bgRect = new Path.Rectangle({
+                    point: [0, 0],
+                    size: [width, height],
+                    fillColor: fillColor
+                });
+                group.addChild(bgRect);
+
+                if (config.bgType.includes('grid')) {
+                    const gridSize = 50;
+                    const strokeColor = config.bgType.includes('beige') ? '#d4c5a9' : '#cbd5e1'; 
+                    const gridGroup = new Group();
+                    
+                    // We need to shift the grid so it matches the originalY phase
+                    // e.g. if originalY is 123, and grid is 50. 123 % 50 = 23 offset.
+                    // We want the line that was at global Y=150 to appear at local Y=(150-123)=27.
+                    const offsetY = -(originalY % gridSize);
+                    const offsetX = 0; // X is usually 0 based
+
+                    for (let x = offsetX; x <= width; x += gridSize) {
+                        const line = new Path.Line(new Point(x, 0), new Point(x, height));
+                        line.strokeColor = strokeColor;
+                        line.strokeWidth = 1;
+                        gridGroup.addChild(line);
+                    }
+                    
+                    // Horizontal lines: start from offset
+                    for (let y = offsetY; y <= height; y += gridSize) {
+                        if (y < 0) continue;
+                        const line = new Path.Line(new Point(0, y), new Point(width, y));
+                        line.strokeColor = strokeColor;
+                        line.strokeWidth = 1;
+                        gridGroup.addChild(line);
+                    }
+                    group.addChild(gridGroup);
+                }
+                return group;
+            },
+
+            async performExport(fmt) {
+                Toast.show("正在處理匯出...");
+                
+                // Clear UI
+                const uiItems = [];
+                project.getItems({ data: (d) => d && (d.isLaser || d.isLassoUI || d.isEraserUI) }).forEach(i => {
+                    uiItems.push({ item: i, parent: i.parent });
+                    i.remove();
+                });
+
+                const fileName = `${AppManager.currentCanvasName}_${new Date().toISOString().slice(0,10)}`;
+                const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer;
+
+                if (!AppManager.currentConfig.width) {
+                    // >> Infinite Canvas <<
+                    let padding = parseInt(document.getElementById('export-padding').value) || 50;
+                    let contentBounds = paintLayer.bounds.clone();
+                    if (contentBounds.width === 0 || contentBounds.height === 0) contentBounds = new Rectangle(0, 0, 800, 600);
+                    
+                    // Expand bounds
+                    contentBounds = contentBounds.expand(padding * 2);
+                    
+                    // Filter items intersecting bounds
+                    const itemsToClone = paintLayer.children.filter(item => item.bounds.intersects(contentBounds));
+                    const clones = itemsToClone.map(c => c.clone());
+                    
+                    // Create Group & Translate to (0,0)
+                    const contentGroup = new Group(clones);
+                    contentGroup.translate(contentBounds.topLeft.multiply(-1)); // Shift to origin
+                    
+                    // Background at (0,0)
+                    const bgGroup = this.createExportBackground(contentBounds.width, contentBounds.height, contentBounds.y);
+                    
+                    // Combine & Clip
+                    const combined = new Group([bgGroup, contentGroup]);
+                    const mask = new Path.Rectangle(new Point(0,0), contentBounds.size);
+                    const exportGroup = new Group([mask, combined]);
+                    exportGroup.clipped = true;
+
+                    if (fmt === 'svg') this.downloadSVG(exportGroup, contentBounds.size, `${fileName}.svg`);
+                    else if (fmt === 'pdf') this.downloadPDF([exportGroup], [contentBounds.size], fileName);
+                    else this.downloadRaster(exportGroup, contentBounds.size, fileName, fmt);
+                    
+                    exportGroup.remove();
+
+                } else {
+                    // >> Finite Canvas (Paged) <<
+                    const w = AppManager.currentConfig.width;
+                    const h = AppManager.currentConfig.height;
+                    const exportGroups = [];
+                    const exportSizes = [];
+
+                    // Filter & Translate Strategy
+                    AppManager.pages.forEach((page, i) => {
+                        const yStart = i * (h + PAGE_GAP);
+                        const pageBounds = new Rectangle(0, yStart, w, h);
+                        
+                        // 1. Find intersecting items
+                        // Important: check strict intersection or containment
+                        const items = paintLayer.children.filter(item => item.bounds.intersects(pageBounds));
+                        const clones = items.map(c => c.clone());
+                        
+                        // 2. Create Content Group & Shift to (0,0)
+                        const contentGroup = new Group(clones);
+                        contentGroup.translate(new Point(0, -yStart));
+                        
+                        // 3. Create Background at (0,0)
+                        const bgGroup = this.createExportBackground(w, h, yStart);
+                        
+                        // 4. Combine
+                        const combined = new Group([bgGroup, contentGroup]);
+                        
+                        // 5. Clip at (0,0) to w/h
+                        const mask = new Path.Rectangle(new Point(0,0), new Size(w, h));
+                        const finalPageGroup = new Group([mask, combined]);
+                        finalPageGroup.clipped = true;
+                        
+                        exportGroups.push(finalPageGroup);
+                        exportSizes.push(new Size(w, h));
+                    });
+
+                    if (fmt === 'pdf') this.downloadPDF(exportGroups, exportSizes, fileName);
+                    else {
+                        for (let i = 0; i < exportGroups.length; i++) {
+                            const suffix = exportGroups.length > 1 ? `_Page${i+1}` : '';
+                            const name = `${fileName}${suffix}`;
+                            if (fmt === 'svg') this.downloadSVG(exportGroups[i], exportSizes[i], `${name}.svg`);
+                            else this.downloadRaster(exportGroups[i], exportSizes[i], name, fmt);
+                            await new Promise(r => setTimeout(r, 200));
+                        }
+                    }
+                    exportGroups.forEach(g => g.remove());
+                }
+
+                uiItems.forEach(obj => obj.parent.addChild(obj.item));
+                Toast.show("匯出完成");
+            },
+
+            downloadSVG(item, size, filename) {
+                const svgStr = item.exportSVG({ asString: true, bounds: new Rectangle(new Point(0,0), size) });
+                const blob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = filename;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            },
+
+            downloadRaster(item, size, filename, fmt) {
+                let scale = 2; 
+                if (size.width * scale > 4000 || size.height * scale > 4000) scale = 1;
+                
+                // Explicitly rasterize the exact size at (0,0)
+                // Paper.js rasterize(resolution) figures out bounds automatically.
+                // Since our group is strictly clipped to (0,0)->(w,h), it should work.
+                const raster = item.rasterize({ resolution: 72 * scale, insert: false });
+                
+                const mime = fmt === 'jpg' ? 'image/jpeg' : 'image/png';
+                const dataUrl = raster.toDataURL(mime);
+                const a = document.createElement('a'); a.href = dataUrl; a.download = `${filename}.${fmt}`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            },
+
+            downloadPDF(groups, sizes, filename) {
+                const { jsPDF } = window.jspdf;
+                const first = sizes[0];
+                const pdf = new jsPDF({ orientation: first.width > first.height ? 'l' : 'p', unit: 'px', format: [first.width, first.height], hotfixes: ["px_scaling"] });
+                
+                groups.forEach((group, i) => {
+                    const s = sizes[i];
+                    if (i > 0) pdf.addPage([s.width, s.height], s.width > s.height ? 'l' : 'p');
+                    
+                    let scale = 1.5;
+                    const raster = group.rasterize({ resolution: 72 * scale, insert: false });
+                    const imgData = raster.toDataURL('image/jpeg', 0.85);
+                    pdf.addImage(imgData, 'JPEG', 0, 0, s.width, s.height);
+                });
+                pdf.save(`${filename}.pdf`);
+            }
+        };
+
         const DB = {
             name: 'MiWhiteboardDB', version: 1, storeName: 'canvases', db: null,
             async init() {
@@ -526,7 +695,6 @@
             renderMulti(config, pageCount) {
                 this.init();
                 this.layer.activate();
-                
                 const isInfinite = !config.width;
                 const width = config.width || 10000;
                 const height = config.height || 10000;
@@ -536,7 +704,6 @@
                 if (isInfinite) {
                     document.body.style.backgroundColor = fillColor;
                     document.body.style.backgroundImage = 'none'; 
-                    
                     if (config.bgType.includes('grid')) {
                         const gridSize = 50;
                         const strokeColor = config.bgType.includes('beige') ? '#d4c5a9' : '#cbd5e1'; 
@@ -545,46 +712,19 @@
                 } else {
                     document.body.style.backgroundColor = '#E2E8F0';
                     document.body.style.backgroundImage = 'none';
-                    
                     for (let i = 0; i < pageCount; i++) {
                         const yOffset = i * (height + PAGE_GAP);
-                        
-                        // Plain page background
-                        const rect = new Path.Rectangle({
-                            point: [0, yOffset],
-                            size: [width, height],
-                            fillColor: fillColor,
-                            shadowColor: new Color(0,0,0,0.1),
-                            shadowBlur: 20,
-                            shadowOffset: new Point(0, 5)
-                        });
-
-                        // Grid lines
+                        const rect = new Path.Rectangle({ point: [0, yOffset], size: [width, height], fillColor: fillColor, shadowColor: new Color(0,0,0,0.1), shadowBlur: 20, shadowOffset: new Point(0, 5) });
                         if (config.bgType.includes('grid')) {
                             const gridSize = 50;
                             const strokeColor = config.bgType.includes('beige') ? '#d4c5a9' : '#cbd5e1';
                             this.drawGrid(0, yOffset, width, height, gridSize, strokeColor);
                         }
-
                         const sepY = yOffset + height + PAGE_GAP/2;
-                        new Path.Rectangle({
-                            point: [width/2 - 60, sepY - 12],
-                            size: [120, 24],
-                            fillColor: '#E2E8F0',
-                            radius: 12
-                        });
-                        
-                        new PointText({
-                            point: [width/2, sepY + 5],
-                            content: `第 ${i + 1} 頁`,
-                            justification: 'center',
-                            fillColor: '#475569',
-                            fontSize: 14,
-                            fontWeight: 'bold'
-                        });
+                        new Path.Rectangle({ point: [width/2 - 60, sepY - 12], size: [120, 24], fillColor: '#E2E8F0', radius: 12 });
+                        new PointText({ point: [width/2, sepY + 5], content: `第 ${i + 1} 頁`, justification: 'center', fillColor: '#475569', fontSize: 14, fontWeight: 'bold' });
                     }
                 }
-
                 project.layers.forEach(l => { if(l !== this.layer) l.activate(); });
                 if(project.activeLayer === this.layer) new Layer().activate(); 
             },
@@ -592,32 +732,22 @@
                 const group = new Group();
                 for (let i = x; i <= x + w; i += step) {
                     const line = new Path.Line(new Point(i, y), new Point(i, y + h));
-                    line.strokeColor = color; 
-                    line.strokeWidth = 1;
-                    group.addChild(line);
+                    line.strokeColor = color; line.strokeWidth = 1; group.addChild(line);
                 }
                 for (let j = y; j <= y + h; j += step) {
                     const line = new Path.Line(new Point(x, j), new Point(x + w, j));
-                    line.strokeColor = color; 
-                    line.strokeWidth = 1;
-                    group.addChild(line);
+                    line.strokeColor = color; line.strokeWidth = 1; group.addChild(line);
                 }
             }
         };
 
-        // New Stable Drag Sort Algorithm
         function getDragAfterElement(container, y) {
             const draggableElements = [...container.querySelectorAll('.page-list-item:not(.dragging)')];
-            
             return draggableElements.reduce((closest, child) => {
                 const box = child.getBoundingClientRect();
                 const offset = y - box.top - box.height / 2;
-                
-                if (offset < 0 && offset > closest.offset) {
-                    return { offset: offset, element: child };
-                } else {
-                    return closest;
-                }
+                if (offset < 0 && offset > closest.offset) return { offset: offset, element: child };
+                else return closest;
             }, { offset: Number.NEGATIVE_INFINITY }).element;
         }
 
@@ -634,13 +764,12 @@
                 this.renderGallery();
                 this.initCreateModal();
                 this.initPageModal();
+                ExportManager.init(); 
                 document.getElementById('btn-create-new').onclick = () => this.showCreateModal();
                 document.getElementById('btn-back-home').onclick = () => this.saveAndExit();
-                
                 document.getElementById('btn-add-page').onclick = () => this.addPage();
                 document.getElementById('btn-add-page-modal').onclick = () => { this.addPage(); document.getElementById('pages-modal').style.display = 'none'; };
                 document.getElementById('btn-pages').onclick = () => this.showPagesModal();
-
                 document.getElementById('loading').style.opacity = 0;
                 setTimeout(() => document.getElementById('loading').remove(), 500);
             },
@@ -651,31 +780,23 @@
                 const bgOptions = document.querySelectorAll('.bg-option');
                 const sizeSelect = document.getElementById('new-canvas-size');
                 const customInputs = document.getElementById('custom-size-inputs');
-
                 sizeSelect.onchange = () => {
                     if(sizeSelect.value === 'custom') customInputs.classList.remove('hidden');
                     else customInputs.classList.add('hidden');
                 };
-                
                 bgOptions.forEach(opt => {
                     opt.onclick = () => {
                         bgOptions.forEach(o => o.classList.remove('selected'));
                         opt.classList.add('selected');
                     };
                 });
-                
-                modal.onclick = (e) => {
-                    if (e.target === modal) modal.style.display = 'none';
-                };
-
+                modal.onclick = (e) => { if (e.target === modal) modal.style.display = 'none'; };
                 cancelBtn.onclick = () => { modal.style.display = 'none'; };
-                
                 confirmBtn.onclick = () => {
                     const nameInput = document.getElementById('new-canvas-name');
                     const selectedBg = document.querySelector('.bg-option.selected').dataset.bg;
                     let width = null, height = null;
                     const val = sizeSelect.value;
-
                     if (val === 'a4') { width = 794; height = 1123; }
                     else if (val === 'a4-l') { width = 1123; height = 794; }
                     else if (val === 'a3') { width = 1123; height = 1587; }
@@ -683,7 +804,6 @@
                         width = parseInt(document.getElementById('custom-width').value) || 1920;
                         height = parseInt(document.getElementById('custom-height').value) || 1080;
                     }
-
                     this.createNew(nameInput.value.trim() || '未命名畫布', selectedBg, width, height);
                     modal.style.display = 'none';
                     nameInput.value = ''; 
@@ -694,43 +814,27 @@
                 document.getElementById('close-pages-modal').onclick = () => modal.style.display = 'none';
                 modal.onclick = (e) => { if(e.target === modal) modal.style.display = 'none'; };
             },
-            showCreateModal() {
-                const modal = document.getElementById('new-canvas-modal');
-                modal.style.display = 'flex';
-                document.getElementById('new-canvas-name').focus();
-            },
+            showCreateModal() { document.getElementById('new-canvas-modal').style.display = 'flex'; document.getElementById('new-canvas-name').focus(); },
             
             showPagesModal() {
+                this.serializePages();
                 this.originalPageIndices.clear();
-                this.pages.forEach((p, i) => {
-                    this.originalPageIndices.set(p.id, i + 1);
-                });
+                this.pages.forEach((p, i) => { this.originalPageIndices.set(p.id, i + 1); });
                 this.renderPageListInModal();
                 document.getElementById('pages-modal').style.display = 'flex';
             },
-
+            
             renderPageListInModal(preserveLabels = false) {
                 const list = document.getElementById('pages-list-container');
                 list.innerHTML = '';
-                
                 this.pages.forEach((p, idx) => {
                     const div = document.createElement('div');
                     div.className = `page-list-item`;
                     div.draggable = true;
                     div.dataset.id = p.id;
-                    
                     let displayNum = idx + 1;
-                    if (preserveLabels && this.originalPageIndices.has(p.id)) {
-                        displayNum = this.originalPageIndices.get(p.id);
-                    }
-
-                    div.innerHTML = `
-                        <div class="page-info-group">
-                            <div class="drag-handle"><i data-lucide="grip-vertical" size="16"></i></div>
-                            <span>第 ${displayNum} 頁</span>
-                        </div>
-                    `;
-                    
+                    if (preserveLabels && this.originalPageIndices.has(p.id)) displayNum = this.originalPageIndices.get(p.id);
+                    div.innerHTML = `<div class="page-info-group"><div class="drag-handle"><i data-lucide="grip-vertical" size="16"></i></div><span>第 ${displayNum} 頁</span></div>`;
                     if (this.pages.length > 1) {
                         const delBtn = document.createElement('button');
                         delBtn.className = 'icon-btn';
@@ -739,7 +843,6 @@
                         delBtn.onclick = (e) => { e.stopPropagation(); this.deletePage(idx); };
                         div.appendChild(delBtn);
                     }
-                    
                     div.onclick = (e) => {
                         if (e.target.closest('button') || e.target.closest('.drag-handle')) return;
                         const currentIdx = Array.from(list.children).indexOf(div);
@@ -750,58 +853,26 @@
                         view.center = new Point(pW/2, centerY);
                         document.getElementById('pages-modal').style.display = 'none';
                     };
-
-                    div.addEventListener('dragstart', (e) => {
-                        div.classList.add('dragging');
-                        const rect = div.getBoundingClientRect();
-                        const offsetX = e.clientX - rect.left;
-                        const offsetY = e.clientY - rect.top;
-                        if (e.dataTransfer.setDragImage) {
-                            e.dataTransfer.setDragImage(div, offsetX, offsetY);
-                        }
-                        this.serializePages(); 
-                    });
-
-                    div.addEventListener('dragend', () => {
-                        div.classList.remove('dragging');
-                        this.commitPageOrder();
-                    });
-
+                    div.addEventListener('dragstart', (e) => { div.classList.add('dragging'); const rect = div.getBoundingClientRect(); if (e.dataTransfer.setDragImage) e.dataTransfer.setDragImage(div, e.clientX - rect.left, e.clientY - rect.top); this.serializePages(); });
+                    div.addEventListener('dragend', () => { div.classList.remove('dragging'); this.commitPageOrder(); });
                     list.appendChild(div);
                 });
-                
-                list.addEventListener('dragover', (e) => {
-                    e.preventDefault();
-                    const afterElement = getDragAfterElement(list, e.clientY);
-                    const draggable = document.querySelector('.dragging');
-                    if (draggable) {
-                        if (afterElement == null) {
-                            list.appendChild(draggable);
-                        } else {
-                            list.insertBefore(draggable, afterElement);
-                        }
-                    }
-                });
-
+                list.addEventListener('dragover', (e) => { e.preventDefault(); const afterElement = getDragAfterElement(list, e.clientY); const draggable = document.querySelector('.dragging'); if (draggable) { if (afterElement == null) list.appendChild(draggable); else list.insertBefore(draggable, afterElement); } });
                 lucide.createIcons();
             },
-
+            
             commitPageOrder() {
                 const list = document.getElementById('pages-list-container');
                 const newOrderIds = Array.from(list.children).map(el => el.dataset.id);
-                
+                this.serializePages();
                 const newPages = [];
-                newOrderIds.forEach(id => {
-                    const page = this.pages.find(p => p.id === id);
-                    if(page) newPages.push(page);
-                });
-                
+                newOrderIds.forEach(id => { const page = this.pages.find(p => p.id === id); if(page) newPages.push(page); });
                 this.pages = newPages;
-                
                 project.clear();
                 this.renderAllPages();
+                this.autoSave(); 
             },
-
+            
             async renderGallery() {
                 const list = await DB.getAll();
                 const container = document.getElementById('gallery-list');
@@ -839,16 +910,7 @@
                 const id = Date.now().toString();
                 const initialPages = [{ id: Date.now().toString(), data: null }];
                 const defaultThumb = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAAXNSR0IArs4c6QAAAA1JREFUGFdj+P///38ACfsD/QVDRcoAAAAASUVORK5CYII=';
-
-                const newCanvas = { 
-                    id: id, 
-                    name: name, 
-                    pages: initialPages,
-                    createdAt: Date.now(), 
-                    updatedAt: Date.now(), 
-                    thumbnail: defaultThumb,
-                    config: { bgType, width, height } 
-                };
+                const newCanvas = { id: id, name: name, pages: initialPages, createdAt: Date.now(), updatedAt: Date.now(), thumbnail: defaultThumb, config: { bgType, width, height } };
                 await DB.save(newCanvas);
                 this.openCanvas(id);
             },
@@ -856,33 +918,20 @@
                 this.currentCanvasId = id;
                 const record = await DB.get(id);
                 document.body.classList.add('mode-editor');
-                
                 this.currentCanvasName = record.name;
                 this.currentConfig = record.config || { bgType: 'white', width: null, height: null };
                 this.currentCreatedAt = record.createdAt || Date.now(); 
                 document.getElementById('canvas-title-display').innerText = record.name;
-
-                if (!record.pages) {
-                    this.pages = [{ id: 'p1', data: record.data }];
-                } else {
-                    this.pages = record.pages;
-                }
-
+                if (!record.pages) this.pages = [{ id: 'p1', data: record.data }];
+                else this.pages = record.pages;
                 project.clear();
                 this.renderAllPages();
-
                 view.zoom = 0.6;
                 updateZoomToast(true);
-
-                if (!this.currentConfig.width) {
-                    view.center = new Point(0,0);
-                } else {
-                    view.center = new Point(this.currentConfig.width/2, this.currentConfig.height/2);
-                }
-
+                if (!this.currentConfig.width) view.center = new Point(0,0);
+                else view.center = new Point(this.currentConfig.width/2, this.currentConfig.height/2);
                 this.renderPageControls();
                 view.update();
-
                 History.stack = []; History.pointer = -1; History.saveState(); 
                 setMode('hand');
                 document.getElementById('sub-toolbar').classList.remove('visible');
@@ -893,44 +942,34 @@
                 const paintLayer = new Layer();
                 paintLayer.name = 'paint';
                 paintLayer.activate();
-
                 const h = this.currentConfig.height || 0;
                 const w = this.currentConfig.width || 0;
                 
                 this.pages.forEach((page, idx) => {
                     if (page.data) {
-                        const tempGroup = new Group();
+                        const tempLayer = new Layer();
                         try {
-                            tempGroup.importJSON(page.data);
+                            tempLayer.importJSON(page.data);
                             if (w > 0 && h > 0) {
                                 const yOffset = idx * (h + PAGE_GAP);
-                                tempGroup.position = tempGroup.position.add([0, yOffset]);
+                                const pointOffset = new Point(0, yOffset);
+                                tempLayer.children.forEach(item => {
+                                    item.position = item.position.add(pointOffset);
+                                });
                             }
-                            const children = [...tempGroup.children];
-                            children.forEach(item => {
-                                if (item instanceof Group) {
-                                    const subItems = [...item.children];
-                                    subItems.forEach(sub => paintLayer.addChild(sub));
-                                    item.remove();
-                                } else {
-                                    paintLayer.addChild(item);
-                                }
+                            const items = [...tempLayer.children]; 
+                            items.forEach(item => {
+                                paintLayer.addChild(item);
                             });
-                        } catch (e) {
-                            console.error("Error importing page data:", e);
-                        }
-                        tempGroup.remove();
+                        } catch (e) { console.error("Error importing page data:", e); }
+                        tempLayer.remove();
                     }
                 });
+                paintLayer.activate();
             },
-
             renderPageControls() {
                 const controls = document.getElementById('page-controls');
-                if (this.currentConfig.width) {
-                    controls.classList.remove('hidden');
-                } else {
-                    controls.classList.add('hidden');
-                }
+                if (this.currentConfig.width) controls.classList.remove('hidden'); else controls.classList.add('hidden');
             },
             
             serializePages() {
@@ -940,27 +979,32 @@
 
                 if (!w || !h) {
                     const tempLayer = new Layer();
-                    paintLayer.children.forEach(item => {
+                    [...paintLayer.children].forEach(item => {
                         if (item.data && (item.data.isLaser || item.data.isLassoUI || item.data.isEraserUI)) return;
                         tempLayer.addChild(item.clone());
                     });
                     if(this.pages.length === 0) this.pages.push({id:'inf', data:null});
                     this.pages[0].data = tempLayer.exportJSON();
                     tempLayer.remove();
+                    paintLayer.activate(); 
                     return;
                 }
 
                 const pageGroups = this.pages.map(p => ({ id: p.id, items: [] }));
+                const children = [...paintLayer.children]; 
                 
-                paintLayer.children.forEach(item => {
+                children.forEach(item => {
                     if (item.data && (item.data.isLaser || item.data.isLassoUI || item.data.isEraserUI)) return;
+                    
                     const cy = item.bounds.center.y;
                     let pageIndex = Math.floor(cy / (h + PAGE_GAP));
                     if (pageIndex < 0) pageIndex = 0;
                     if (pageIndex >= this.pages.length) pageIndex = this.pages.length - 1;
+                    
                     const clone = item.clone();
                     const yOffset = pageIndex * (h + PAGE_GAP);
                     clone.position = clone.position.subtract([0, yOffset]);
+                    
                     pageGroups[pageIndex].items.push(clone);
                 });
 
@@ -974,6 +1018,7 @@
                         this.pages[idx].data = null;
                     }
                 });
+                paintLayer.activate();
             },
 
             addPage() {
@@ -988,7 +1033,6 @@
                 const y = idx * (h + PAGE_GAP) + h/2;
                 view.center = new Point(w/2, y);
             },
-            
             deletePage(idx) {
                 if (this.pages.length <= 1) return;
                 this.serializePages();
@@ -997,53 +1041,24 @@
                 this.renderAllPages();
                 this.showPagesModal(); 
             },
-
             async saveAndExit() {
                 if (!this.currentCanvasId) return;
-                
-                project.getItems({ 
-                    data: (d) => d && (d.isLaser || d.isLassoUI || d.isEraserUI) 
-                }).forEach(i => i.remove());
-                
-                App.laserTrails = [];
-                App.activeLaserTrail = null;
-                App.lassoPath = null;
-                App.eraserPreview = null;
-                App.rectPath = null;
-
+                project.getItems({ data: (d) => d && (d.isLaser || d.isLassoUI || d.isEraserUI) }).forEach(i => i.remove());
+                App.laserTrails = []; App.activeLaserTrail = null; App.lassoPath = null; App.eraserPreview = null; App.rectPath = null;
                 this.serializePages();
                 view.update();
-
                 const sourceCanvas = document.getElementById('canvas');
                 const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = sourceCanvas.width;
-                tempCanvas.height = sourceCanvas.height;
+                tempCanvas.width = sourceCanvas.width; tempCanvas.height = sourceCanvas.height;
                 const ctx = tempCanvas.getContext('2d');
-
                 let bgFill = '#F8FAFC'; 
-                if (!this.currentConfig.width) {
-                    bgFill = this.currentConfig.bgType.includes('beige') ? '#FFF8E1' : '#FFFFFF';
-                } else {
-                    bgFill = '#E2E8F0'; 
-                }
-
+                if (!this.currentConfig.width) bgFill = this.currentConfig.bgType.includes('beige') ? '#FFF8E1' : '#FFFFFF'; else bgFill = '#E2E8F0'; 
                 ctx.fillStyle = bgFill;
                 ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
                 ctx.drawImage(sourceCanvas, 0, 0);
-
                 const thumbData = tempCanvas.toDataURL('image/jpeg', 0.5);
-
-                const record = { 
-                    id: this.currentCanvasId, 
-                    name: this.currentCanvasName, 
-                    pages: this.pages,
-                    thumbnail: thumbData, 
-                    updatedAt: Date.now(), 
-                    createdAt: this.currentCreatedAt,
-                    config: this.currentConfig
-                };
+                const record = { id: this.currentCanvasId, name: this.currentCanvasName, pages: this.pages, thumbnail: thumbData, updatedAt: Date.now(), createdAt: this.currentCreatedAt, config: this.currentConfig };
                 await DB.save(record);
-                
                 project.clear();
                 document.body.style.backgroundColor = '#F8FAFC';
                 document.body.style.backgroundImage = 'none'; 
@@ -1055,11 +1070,7 @@
                 if (!this.currentCanvasId) return;
                 this.serializePages();
                 const currentRec = await DB.get(this.currentCanvasId);
-                if(currentRec) {
-                    currentRec.pages = this.pages;
-                    currentRec.updatedAt = Date.now();
-                    await DB.save(currentRec);
-                }
+                if(currentRec) { currentRec.pages = this.pages; currentRec.updatedAt = Date.now(); await DB.save(currentRec); }
             }
         };
 
@@ -1074,53 +1085,28 @@
             activePointers: new Map(), isGesturing: false, prevDist: 0, prevC: null,
             laserTrails: [], activeLaserTrail: null, lastLaserActivity: 0,
             isTempPanning: false,
-            backupLayerJSON: null // [FIX] Store state before erase starts
+            backupLayerJSON: null
         };
         
         const ToolSettings = {
-            // [Feature] Store presets per tool type
             presets: {
-                pen: {
-                    fountain: { color: '#1E293B', width: 8, opacity: 1 },
-                    ballpoint: { color: '#1E293B', width: 3, opacity: 1 },
-                    highlighter: { color: '#FEF08A', width: 30, opacity: 0.5 }
-                },
+                pen: { fountain: { color: '#1E293B', width: 8, opacity: 1 }, ballpoint: { color: '#1E293B', width: 3, opacity: 1 }, highlighter: { color: '#FEF08A', width: 30, opacity: 0.5 } },
                 eraser: { size: 20, mode: 'standard' },
                 penDrawMode: 'free'
             },
             save() {
-                if(App.mode === 'pen') {
-                    this.presets.pen[App.penType] = { color: App.strokeColor, width: App.strokeWidth, opacity: App.strokeOpacity };
-                    this.presets.penDrawMode = App.penDrawMode;
-                } else if(App.mode.startsWith('eraser')) {
-                    this.presets.eraser = { size: App.eraserSize, mode: App.eraserMode };
-                }
+                if(App.mode === 'pen') { this.presets.pen[App.penType] = { color: App.strokeColor, width: App.strokeWidth, opacity: App.strokeOpacity }; this.presets.penDrawMode = App.penDrawMode; } 
+                else if(App.mode.startsWith('eraser')) { this.presets.eraser = { size: App.eraserSize, mode: App.eraserMode }; }
                 localStorage.setItem('MiWhiteboard_ToolSettings', JSON.stringify(this.presets));
             },
             load() {
                 const saved = localStorage.getItem('MiWhiteboard_ToolSettings');
-                if (saved) {
-                    try {
-                        const s = JSON.parse(saved);
-                        if(s.pen) this.presets.pen = {...this.presets.pen, ...s.pen};
-                        if(s.eraser) this.presets.eraser = {...this.presets.eraser, ...s.eraser};
-                        if(s.penDrawMode) this.presets.penDrawMode = s.penDrawMode;
-                    } catch(e) { console.error("Settings load error", e); }
-                }
+                if (saved) { try { const s = JSON.parse(saved); if(s.pen) this.presets.pen = {...this.presets.pen, ...s.pen}; if(s.eraser) this.presets.eraser = {...this.presets.eraser, ...s.eraser}; if(s.penDrawMode) this.presets.penDrawMode = s.penDrawMode; } catch(e) { console.error("Settings load error", e); } }
                 this.apply('fountain');
             },
             apply(type) {
-                if (App.mode === 'pen') {
-                    const p = this.presets.pen[type || App.penType];
-                    App.strokeColor = p.color;
-                    App.strokeWidth = p.width;
-                    App.strokeOpacity = p.opacity;
-                    App.penDrawMode = this.presets.penDrawMode;
-                } else if (App.mode.startsWith('eraser')) {
-                    const e = this.presets.eraser;
-                    App.eraserSize = e.size;
-                    App.eraserMode = e.mode;
-                }
+                if (App.mode === 'pen') { const p = this.presets.pen[type || App.penType]; App.strokeColor = p.color; App.strokeWidth = p.width; App.strokeOpacity = p.opacity; App.penDrawMode = this.presets.penDrawMode; } 
+                else if (App.mode.startsWith('eraser')) { const e = this.presets.eraser; App.eraserSize = e.size; App.eraserMode = e.mode; }
             }
         };
         
@@ -1148,11 +1134,9 @@
             redo() { if (this.pointer < this.stack.length - 1) { this.pointer++; this.restoreState(); } },
             restoreState() { 
                 const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer;
-                
                 clearLasso();
                 if(App.eraserPreview) { App.eraserPreview.remove(); App.eraserPreview = null; }
                 if(App.rectPath) { App.rectPath.remove(); App.rectPath = null; }
-                
                 paintLayer.removeChildren(); 
                 paintLayer.importJSON(this.stack[this.pointer]); 
                 this.updateButtons(); 
@@ -1165,12 +1149,7 @@
         window.onload = function() {
             lucide.createIcons();
             paper.setup('canvas');
-            
-            // [GPU 效能優化] 禁用自動矩陣應用
-            // 當此設為 false 時，縮放和移動群組不會重新計算每個子項目的點，
-            // 而是直接改變變換矩陣，大幅減少 CPU 計算量。
             paper.settings.applyMatrix = false;
-
             ToolSettings.load(); 
             initColorPicker();
             initEvents();
@@ -1191,48 +1170,31 @@
         function onFrame(event) {
             if (App.laserTrails.length === 0) return;
             const now = Date.now();
-            
             const isGlobalIdle = (now - App.lastLaserActivity) > 800;
             const vanishDuration = 500;
             const scaleFactor = 1 / view.zoom;
             const glowSize = 16 * scaleFactor;
             const coreSize = 6 * scaleFactor;
-            
             for (let i = App.laserTrails.length - 1; i >= 0; i--) {
                 const trail = App.laserTrails[i];
                 if (trail.pathGlow) { trail.pathGlow.remove(); trail.pathGlow = null; }
                 if (trail.pathCore) { trail.pathCore.remove(); trail.pathCore = null; }
-                
-                if (!trail.isDrawing && !trail.vanishing && isGlobalIdle) {
-                    trail.vanishing = true;
-                    trail.vanishStartTime = now;
-                }
-
+                if (!trail.isDrawing && !trail.vanishing && isGlobalIdle) { trail.vanishing = true; trail.vanishStartTime = now; }
                 let visiblePoints = trail.points;
-
                 if (trail.vanishing) {
                     const timeSinceVanishStart = now - trail.vanishStartTime;
-                    
-                    if (timeSinceVanishStart >= vanishDuration) {
-                        App.laserTrails.splice(i, 1);
-                        continue;
-                    }
-
+                    if (timeSinceVanishStart >= vanishDuration) { App.laserTrails.splice(i, 1); continue; }
                     const vanishProgress = timeSinceVanishStart / vanishDuration;
                     const cutoffLen = trail.totalLen * vanishProgress;
                     visiblePoints = trail.points.filter(p => p.len >= cutoffLen);
                 }
-
                 if (visiblePoints.length < 2 && !trail.isDrawing) continue;
-
                 const strokePoints = visiblePoints.map(p => ({ x: p.x, y: p.y, pressure: p.pressure }));
-                
                 const glowOptions = { size: glowSize, thinning: 0.5, smoothing: 0.5, streamline: 0.5, start: { taper: 0, cap: true }, end: { taper: 0, cap: true } };
                 const outlineGlow = getStroke(strokePoints, glowOptions);
                 const pathDataGlow = window.getSvgPathFromStroke(outlineGlow);
                 trail.pathGlow = new Path({ pathData: pathDataGlow, fillColor: '#FF0000', shadowColor: '#FF0000', shadowBlur: 10 * scaleFactor, opacity: 0.9, insert: true });
                 trail.pathGlow.data = { isLaser: true };
-                
                 const coreOptions = { size: coreSize, thinning: 0.7, smoothing: 0.5, streamline: 0.5, start: { taper: 0, cap: true }, end: { taper: 0, cap: true } };
                 const outlineCore = getStroke(strokePoints, coreOptions);
                 const pathDataCore = window.getSvgPathFromStroke(outlineCore);
@@ -1268,9 +1230,6 @@
             const palmCheck = document.getElementById('palm-check'); const fingerSel = document.getElementById('finger-pressure-mode'); const stylusSel = document.getElementById('stylus-pressure-mode');
             palmCheck.checked = Settings.palmRejection; fingerSel.value = Settings.fingerMode; stylusSel.value = Settings.stylusMode;
             palmCheck.onchange = (e) => Settings.palmRejection = e.target.checked; fingerSel.onchange = (e) => Settings.fingerMode = e.target.value; stylusSel.onchange = (e) => Settings.stylusMode = e.target.value;
-            const btn34Sel = document.getElementById('btn-34-action'); const btn33Sel = document.getElementById('btn-33-action');
-            btn34Sel.value = Settings.stylusBtn34; btn33Sel.value = Settings.stylusBtn33;
-            btn34Sel.onchange = (e) => Settings.stylusBtn34 = e.target.value; btn33Sel.onchange = (e) => Settings.stylusBtn33 = e.target.value;
         }
 
         function executeStylusAction(action) {
@@ -1299,13 +1258,11 @@
             document.addEventListener('keydown', (e) => { 
                 if(!AppManager.currentCanvasId) return; 
                 if(e.target.tagName === 'INPUT') return;
-
                 const key = e.key.toLowerCase();
                 if (e.keyCode === 34) { e.preventDefault(); executeStylusAction(Settings.stylusBtn34); return; } 
                 if (e.keyCode === 33) { e.preventDefault(); executeStylusAction(Settings.stylusBtn33); return; } 
                 if ((e.ctrlKey || e.metaKey) && key === 'z') { e.preventDefault(); if (e.shiftKey) History.redo(); else History.undo(); return; } 
                 if ((e.ctrlKey || e.metaKey) && key === 'y') { e.preventDefault(); History.redo(); return; } 
-                
                 if (key === 'b' || key === 'p') { setMode('pen'); Toast.show('畫筆'); }
                 else if (key === 'e') { setMode('eraser'); Toast.show('橡皮擦'); }
                 else if (key === 'r') { setMode('eraser-rect'); Toast.show('方框擦除'); }
@@ -1314,318 +1271,144 @@
                 else if (key === 'h') { setMode('hand'); Toast.show('抓手工具'); }
                 else if (key === 'delete' || key === 'backspace') { if(App.lassoState === 'selected') deleteSelection(); }
             });
-            
             ['hand', 'pen', 'eraser', 'eraser-rect', 'lasso', 'laser'].forEach(m => document.getElementById(`tool-${m}`).onclick = () => setMode(m));
-            
             document.getElementById('tool-clear').onclick = async () => { 
                 const confirmed = await Dialog.confirm('清空確認', '確定清空整個畫布嗎？此動作可復原。');
-                if(confirmed){ 
-                    const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer;
-                    paintLayer.removeChildren(); 
-                    clearLasso(); 
-                    History.saveState(); 
-                }
+                if(confirmed){ const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer; paintLayer.removeChildren(); clearLasso(); History.saveState(); }
             };
-            
             document.getElementById('btn-undo').onclick = () => History.undo(); document.getElementById('btn-redo').onclick = () => History.redo();
             document.getElementById('lasso-dup').onclick = duplicateSelection; document.getElementById('lasso-del').onclick = deleteSelection;
         }
 
         function setMode(m) {
             const sub = document.getElementById('sub-toolbar');
-            
             if (App.mode === m) {
                 if (m === 'hand') return; 
-                if (sub.classList.contains('visible')) {
-                    sub.classList.remove('visible');
-                } else {
-                    updateSubToolbar();
-                    sub.classList.add('visible');
-                }
+                if (sub.classList.contains('visible')) { sub.classList.remove('visible'); } else { updateSubToolbar(); sub.classList.add('visible'); }
             } else {
                 if (App.mode === 'lasso' && m !== 'lasso') clearLasso();
-                if (App.currentPath) { App.currentPath.remove(); App.currentPath = null; App.currentPoints = []; } // Safety clear
+                if (App.currentPath) { App.currentPath.remove(); App.currentPath = null; App.currentPoints = []; } 
                 App.mode = m;
                 document.querySelectorAll('.main-tools .btn').forEach(b => b.classList.remove('active'));
-                
                 const map = {hand:'tool-hand', pen:'tool-pen', eraser:'tool-eraser', 'eraser-rect':'tool-eraser-rect', lasso:'tool-lasso', laser:'tool-laser'};
                 if(map[m]) document.getElementById(map[m]).classList.add('active');
-                
-                // [New] Apply saved settings when switching tools
-                if(m === 'pen') ToolSettings.apply(App.penType); 
-                else if(m.startsWith('eraser')) ToolSettings.apply();
-
-                if (m === 'hand') {
-                    document.body.classList.add('cursor-hand');
-                    sub.classList.remove('visible');
-                } else {
-                    document.body.classList.remove('cursor-hand', 'cursor-hand-grabbing');
-                    updateSubToolbar();
-                    sub.classList.remove('visible');
-                }
+                if(m === 'pen') ToolSettings.apply(App.penType); else if(m.startsWith('eraser')) ToolSettings.apply();
+                if (m === 'hand') { document.body.classList.add('cursor-hand'); sub.classList.remove('visible'); } 
+                else { document.body.classList.remove('cursor-hand', 'cursor-hand-grabbing'); updateSubToolbar(); sub.classList.remove('visible'); }
             }
         }
 
         function isPointAllowed(point) {
             if (!AppManager.currentConfig.width) return true; 
-            
-            const w = AppManager.currentConfig.width;
-            const h = AppManager.currentConfig.height;
-            const count = AppManager.pages.length;
-            
+            const w = AppManager.currentConfig.width; const h = AppManager.currentConfig.height; const count = AppManager.pages.length;
             if (point.x < 0 || point.x > w) return false;
-            
-            for (let i = 0; i < count; i++) {
-                const startY = i * (h + PAGE_GAP);
-                const endY = startY + h;
-                if (point.y >= startY && point.y <= endY) return true;
-            }
+            for (let i = 0; i < count; i++) { const startY = i * (h + PAGE_GAP); const endY = startY + h; if (point.y >= startY && point.y <= endY) return true; }
             return false;
         }
 
         function onPointerDown(e) {
             if (e.target.id === 'canvas') document.getElementById('sub-toolbar').classList.remove('visible');
             if (e.target.closest('.panel') || e.target.closest('#color-popover') || e.target.closest('.modal-content') || e.target.closest('.editor-nav') || e.target.closest('.editor-header-bar')) return;
-            
             canvas.setPointerCapture(e.pointerId); App.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            
             if (App.activePointers.size === 2) { startGesture(); return; }
-            
-            if (App.mode === 'hand') {
-                document.body.classList.add('cursor-hand-grabbing');
-                App.prevC = { x: e.clientX, y: e.clientY };
-                return;
-            }
-
+            if (App.mode === 'hand') { document.body.classList.add('cursor-hand-grabbing'); App.prevC = { x: e.clientX, y: e.clientY }; return; }
             const p = view.viewToProject(new Point(e.clientX, e.clientY));
-            
             const allowed = isPointAllowed(p);
-
-            if (!allowed && App.mode !== 'laser') {
-                App.isTempPanning = true;
-                document.body.classList.add('cursor-hand-grabbing');
-                App.prevC = { x: e.clientX, y: e.clientY };
-                return;
-            }
-
+            if (!allowed && App.mode !== 'laser') { App.isTempPanning = true; document.body.classList.add('cursor-hand-grabbing'); App.prevC = { x: e.clientX, y: e.clientY }; return; }
             const pressure = getInputPressure(e, p, null, 0); if (pressure === -1) return;
-            
             if (App.activePointers.size === 1 && !App.isGesturing) { 
                 if (App.mode === 'pen') startPenStroke(p, pressure); 
-                else if (App.mode === 'eraser') {
-                    // [FIX] Save state BEFORE we destroy it
-                    App.backupLayerJSON = getCleanStateJSON();
-                    eraseAt(p); 
-                }
+                else if (App.mode === 'eraser') { App.backupLayerJSON = getCleanStateJSON(); eraseAt(p); }
                 else if (App.mode === 'eraser-rect') startRectEraser(p); 
                 else if (App.mode === 'lasso') handleLassoDown(p); 
                 else if (App.mode === 'laser') { 
-                    const trail = { 
-                        id: Date.now(), 
-                        points: [{x: p.x, y: p.y, pressure: pressure, len: 0}], 
-                        pathGlow: null, pathCore: null, 
-                        isDrawing: true, 
-                        vanishing: false, 
-                        vanishStartTime: 0,
-                        liftTime: null, 
-                        totalLen: 0 
-                    };
-                    App.laserTrails.push(trail);
-                    App.activeLaserTrail = trail;
-                    App.lastLaserActivity = Date.now();
+                    const trail = { id: Date.now(), points: [{x: p.x, y: p.y, pressure: pressure, len: 0}], pathGlow: null, pathCore: null, isDrawing: true, vanishing: false, vanishStartTime: 0, liftTime: null, totalLen: 0 };
+                    App.laserTrails.push(trail); App.activeLaserTrail = trail; App.lastLaserActivity = Date.now();
                 }
                 App.lastPointTime = Date.now(); 
             }
         }
         function onPointerMove(e) {
             if (App.activePointers.has(e.pointerId)) App.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            
             if (App.activePointers.size === 2) { handleGesture(); return; }
-            
             if ((App.mode === 'hand' || App.isTempPanning) && App.activePointers.size === 1 && e.buttons) {
                 const current = { x: e.clientX, y: e.clientY };
-                if (App.prevC) {
-                    const delta = new Point(App.prevC.x - current.x, App.prevC.y - current.y);
-                    view.center = view.center.add(delta.divide(view.zoom));
-                }
-                App.prevC = current;
-                return;
+                if (App.prevC) { const delta = new Point(App.prevC.x - current.x, App.prevC.y - current.y); view.center = view.center.add(delta.divide(view.zoom)); }
+                App.prevC = current; return;
             }
-
             if (App.activePointers.size === 1 && !App.isGesturing && (e.buttons || e.pointerType === 'touch')) {
                 if (e.pointerType !== 'pen' && Settings.palmRejection) return;
-                
                 const rawEvents = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; 
                 const lastP = App.currentPoints.length > 0 ? new Point(App.currentPoints[App.currentPoints.length-1]) : null;
-                
                 const currentP = view.viewToProject(new Point(e.clientX, e.clientY));
-                if (App.mode !== 'laser' && !isPointAllowed(currentP)) {
-                    if (App.mode === 'pen' && App.currentPath) finalizeStroke();
-                    return;
-                }
-
+                if (App.mode !== 'laser' && !isPointAllowed(currentP)) { if (App.mode === 'pen' && App.currentPath) finalizeStroke(); return; }
                 if (App.mode === 'pen' && App.currentPath) { 
-                    if (App.penDrawMode === 'line') {
-                        const pt = view.viewToProject(new Point(e.clientX, e.clientY));
-                        const start = App.currentPoints[0];
-                        App.currentPoints = [start, { x: pt.x, y: pt.y, pressure: 0.5 }]; 
-                    } else {
-                        rawEvents.forEach(evt => { const pt = view.viewToProject(new Point(evt.clientX, evt.clientY)); const pressure = getInputPressure(evt, pt, lastP, App.lastPointTime); App.currentPoints.push({ x: pt.x, y: pt.y, pressure: pressure }); App.lastPointTime = Date.now(); }); 
-                    }
+                    if (App.penDrawMode === 'line') { const pt = view.viewToProject(new Point(e.clientX, e.clientY)); const start = App.currentPoints[0]; App.currentPoints = [start, { x: pt.x, y: pt.y, pressure: 0.5 }]; } 
+                    else { rawEvents.forEach(evt => { const pt = view.viewToProject(new Point(evt.clientX, evt.clientY)); const pressure = getInputPressure(evt, pt, lastP, App.lastPointTime); App.currentPoints.push({ x: pt.x, y: pt.y, pressure: pressure }); App.lastPointTime = Date.now(); }); }
                     renderCurrentStroke(); 
                 } 
                 else if (App.mode === 'laser' && App.activeLaserTrail) {
                     App.lastLaserActivity = Date.now();
                     rawEvents.forEach(evt => {
-                        const pt = view.viewToProject(new Point(evt.clientX, evt.clientY));
-                        const trail = App.activeLaserTrail;
-                        let dist = 0;
+                        const pt = view.viewToProject(new Point(evt.clientX, evt.clientY)); const trail = App.activeLaserTrail; let dist = 0;
                         if(trail.points.length > 0) { const last = trail.points[trail.points.length - 1]; const dx = pt.x - last.x; const dy = pt.y - last.y; dist = Math.sqrt(dx*dx + dy*dy); }
-                        trail.totalLen += dist;
-                        trail.points.push({ x: pt.x, y: pt.y, pressure: e.pressure || 0.5, len: trail.totalLen });
+                        trail.totalLen += dist; trail.points.push({ x: pt.x, y: pt.y, pressure: e.pressure || 0.5, len: trail.totalLen });
                     });
                 }
-                else { 
-                    const p = view.viewToProject(new Point(e.clientX, e.clientY)); 
-                    if (App.mode === 'eraser') eraseAt(p); 
-                    else if (App.mode === 'eraser-rect') updateRectEraser(p); 
-                    else if (App.mode === 'lasso') handleLassoMove(p); 
-                }
+                else { const p = view.viewToProject(new Point(e.clientX, e.clientY)); if (App.mode === 'eraser') eraseAt(p); else if (App.mode === 'eraser-rect') updateRectEraser(p); else if (App.mode === 'lasso') handleLassoMove(p); }
             }
         }
         function onPointerUp(e) {
             const wasGesturing = App.isGesturing; App.activePointers.delete(e.pointerId); if (App.activePointers.size === 0) App.isGesturing = false; 
-            
-            if (App.mode === 'hand') {
-                document.body.classList.remove('cursor-hand-grabbing');
-                App.prevC = null;
-            }
-
-            if (App.isTempPanning) {
-                App.isTempPanning = false;
-                document.body.classList.remove('cursor-hand-grabbing');
-                App.prevC = null;
-                return;
-            }
-
-            if (wasGesturing) {
-                if (App.lassoState === 'selected') updateLassoMenu();
-                return;
-            }
-            
-            // [FIX] Clear backup state as gesture didn't happen
+            if (App.mode === 'hand') { document.body.classList.remove('cursor-hand-grabbing'); App.prevC = null; }
+            if (App.isTempPanning) { App.isTempPanning = false; document.body.classList.remove('cursor-hand-grabbing'); App.prevC = null; return; }
+            if (wasGesturing) { if (App.lassoState === 'selected') updateLassoMenu(); return; }
             App.backupLayerJSON = null;
-
             if (App.mode === 'pen' && App.currentPath) finalizeStroke(); 
             else if (App.mode === 'eraser') { if (App.eraserPreview) { App.eraserPreview.remove(); App.eraserPreview = null; } History.saveState(); } 
             else if (App.mode === 'eraser-rect') finalizeRectEraser(); 
             else if (App.mode === 'lasso') handleLassoUp();
-            else if (App.mode === 'laser' && App.activeLaserTrail) { 
-                
-                App.activeLaserTrail.isDrawing = false; 
-                App.activeLaserTrail.liftTime = Date.now(); 
-                App.activeLaserTrail = null; 
-                App.lastLaserActivity = Date.now();
-            }
+            else if (App.mode === 'laser' && App.activeLaserTrail) { App.activeLaserTrail.isDrawing = false; App.activeLaserTrail.liftTime = Date.now(); App.activeLaserTrail = null; App.lastLaserActivity = Date.now(); }
         }
 
         function ensurePaintLayer() {
-            let pl = project.layers.find(l => l.name === 'paint');
-            if(!pl) { pl = new Layer(); pl.name = 'paint'; }
-            pl.activate();
-            return pl;
+            let pl = project.layers.find(l => l.name === 'paint'); if(!pl) { pl = new Layer(); pl.name = 'paint'; } pl.activate(); return pl;
         }
 
         function startPenStroke(point, pressure) { 
-            ensurePaintLayer();
-            clearLasso(); 
-            let p = pressure;
-            if (App.penDrawMode === 'line') p = 0.5;
+            ensurePaintLayer(); clearLasso(); let p = pressure; if (App.penDrawMode === 'line') p = 0.5;
             App.currentPoints = [{ x: point.x, y: point.y, pressure: p }]; 
             App.currentPath = new Path({ fillColor: App.strokeColor, opacity: App.strokeOpacity, blendMode: App.penType === 'highlighter' ? 'multiply' : 'normal', insert: true }); 
         }
-        
         function renderCurrentStroke() { 
             if (!App.currentPath || App.currentPoints.length < 1) return; 
             let options = { size: App.strokeWidth, start: { taper: 0, cap: true }, end: { taper: 0, cap: true }, simulatePressure: false, streamline: 0.5 }; 
-            
-            // [Fix] Strict straight line rendering (no bulging, equal width)
-            if (App.penDrawMode === 'line') {
-                options.thinning = 0; 
-                options.smoothing = 0; 
-                options.streamline = 0;
-                options.easing = (t) => t; // Linear easing
-                options.start = { taper: 0, cap: true }; 
-                options.end = { taper: 0, cap: true };
-            } else {
-                if (App.penType === 'fountain') { options.thinning = 0.8; options.smoothing = 0.5; } else options.thinning = 0; 
-            }
-
-            const outline = getStroke(App.currentPoints, options); 
-            App.currentPath.pathData = window.getSvgPathFromStroke(outline); 
+            if (App.penDrawMode === 'line') { options.thinning = 0; options.smoothing = 0; options.streamline = 0; options.easing = (t) => t; options.start = { taper: 0, cap: true }; options.end = { taper: 0, cap: true }; } 
+            else { if (App.penType === 'fountain') { options.thinning = 0.8; options.smoothing = 0.5; } else options.thinning = 0; }
+            const outline = getStroke(App.currentPoints, options); App.currentPath.pathData = window.getSvgPathFromStroke(outline); 
         }
-        
         function finalizeStroke() { 
-            if (App.penDrawMode === 'line' && App.currentPoints.length === 1) {
-                const p = App.currentPoints[0];
-                App.currentPoints.push({ x: p.x, y: p.y, pressure: 0.5 });
-            }
-
+            if (App.penDrawMode === 'line' && App.currentPoints.length === 1) { const p = App.currentPoints[0]; App.currentPoints.push({ x: p.x, y: p.y, pressure: 0.5 }); }
             renderCurrentStroke(); 
-            
-            // [Fix] Do NOT simplify straight lines or outlines generated by perfect-freehand
-            // simplify(1) was causing the "swelling" artifact by distorting the rectangle shape
-            // App.currentPath.simplify(1); 
-            
-            const normalized = App.currentPath.unite(App.currentPath); 
-            App.currentPath.remove(); 
-            normalized.fillColor = App.strokeColor; 
-            normalized.opacity = App.strokeOpacity; 
-            normalized.blendMode = App.penType === 'highlighter' ? 'multiply' : 'normal'; 
+            const normalized = App.currentPath.unite(App.currentPath); App.currentPath.remove(); 
+            normalized.fillColor = App.strokeColor; normalized.opacity = App.strokeOpacity; normalized.blendMode = App.penType === 'highlighter' ? 'multiply' : 'normal'; 
             if (!normalized.parent) ensurePaintLayer().addChild(normalized); 
-            App.currentPath = null; 
-            App.currentPoints = []; 
-            History.saveState(); 
+            App.currentPath = null; App.currentPoints = []; History.saveState(); 
         }
-        
         function eraseAt(point) { 
             if (App.eraserPreview) App.eraserPreview.remove(); 
-            App.eraserPreview = new Path.Circle({ 
-                center: point, 
-                radius: App.eraserSize, 
-                strokeColor: '#EF4444', 
-                fillColor: new Color(1,0,0,0.2), 
-                strokeWidth: 1/view.zoom,
-                data: { isEraserUI: true }
-            }); 
+            App.eraserPreview = new Path.Circle({ center: point, radius: App.eraserSize, strokeColor: '#EF4444', fillColor: new Color(1,0,0,0.2), strokeWidth: 1/view.zoom, data: { isEraserUI: true } }); 
             performErase(new Path.Circle({ center: point, radius: App.eraserSize, insert: false })); 
         }
         function startRectEraser(point) { 
-            clearLasso(); 
-            App.rectStart = point; 
-            App.rectPath = new Path.Rectangle({ 
-                from: point, to: point, 
-                fillColor: new Color(1,0,0,0.1), 
-                strokeColor: '#EF4444', 
-                dashArray: [4,4], 
-                strokeWidth: 1/view.zoom,
-                data: { isEraserUI: true }
-            }); 
+            clearLasso(); App.rectStart = point; 
+            App.rectPath = new Path.Rectangle({ from: point, to: point, fillColor: new Color(1,0,0,0.1), strokeColor: '#EF4444', dashArray: [4,4], strokeWidth: 1/view.zoom, data: { isEraserUI: true } }); 
         }
         function updateRectEraser(point) { 
-            if (!App.rectPath) return; 
-            App.rectPath.remove(); 
-            App.rectPath = new Path.Rectangle({ 
-                from: App.rectStart, to: point, 
-                fillColor: new Color(1,0,0,0.1), 
-                strokeColor: '#EF4444', 
-                dashArray: [4,4], 
-                strokeWidth: 1/view.zoom,
-                data: { isEraserUI: true }
-            }); 
+            if (!App.rectPath) return; App.rectPath.remove(); 
+            App.rectPath = new Path.Rectangle({ from: App.rectStart, to: point, fillColor: new Color(1,0,0,0.1), strokeColor: '#EF4444', dashArray: [4,4], strokeWidth: 1/view.zoom, data: { isEraserUI: true } }); 
         }
         function finalizeRectEraser() { if (App.rectPath) { performErase(new Path.Rectangle(App.rectPath.bounds)); App.rectPath.remove(); App.rectPath = null; History.saveState(); } }
-        
         function performErase(eraserItem) {
             const paintLayer = ensurePaintLayer();
             const items = paintLayer.children.filter(i => i !== App.eraserPreview && i !== App.rectPath && !i.data.isLassoUI && !i.data.isLaser && !i.data.isEraserUI);
@@ -1639,226 +1422,77 @@
         function separateDisjointPaths(item) { if (item instanceof Path) return [item]; if (item instanceof CompoundPath) { const children = item.removeChildren(); item.remove(); if (!children.length) return []; children.sort((a,b)=>Math.abs(b.area)-Math.abs(a.area)); const islands = []; for(let child of children){ let p = islands.find(isl => isl.body.bounds.contains(child.bounds) && isl.body.contains(child.firstSegment.point)); if(p) p.holes.push(child); else islands.push({body:child, holes:[]}); } return islands.map(isl => isl.holes.length ? new CompoundPath({children:[isl.body, ...isl.holes]}) : isl.body); } return [item]; }
         
         function handleLassoDown(point) { 
-            if (App.lassoState === 'selected' && App.lassoPath.contains(point)) { 
-                App.lassoState = 'moving'; 
-                App.lassoPrevPoint = point; 
-                return; 
-            } 
-            
-            clearLasso(true); 
-            App.lassoState = 'drawing'; 
-            App.lassoPath = new Path({ 
-                strokeColor: '#3B82F6', 
-                strokeWidth: 2/view.zoom, 
-                dashArray: [5,5], 
-                data: {isLassoUI:true} 
-            }); 
-            App.lassoPath.add(point); 
-            updateLassoVisuals();
+            if (App.lassoState === 'selected' && App.lassoPath.contains(point)) { App.lassoState = 'moving'; App.lassoPrevPoint = point; return; } 
+            clearLasso(true); App.lassoState = 'drawing'; 
+            App.lassoPath = new Path({ strokeColor: '#3B82F6', strokeWidth: 2/view.zoom, dashArray: [5,5], data: {isLassoUI:true} }); 
+            App.lassoPath.add(point); updateLassoVisuals();
         }
-
         function handleLassoMove(point) { 
-            if (App.lassoState === 'drawing') {
-                App.lassoPath.add(point); 
-            } else if (App.lassoState === 'moving') { 
-                const delta = point.subtract(App.lassoPrevPoint); 
-                App.lassoItems.forEach(i => i.position = i.position.add(delta)); 
-                App.lassoPath.position = App.lassoPath.position.add(delta); 
-                App.lassoPrevPoint = point; 
-                updateLassoMenu(); 
-            } 
+            if (App.lassoState === 'drawing') { App.lassoPath.add(point); } 
+            else if (App.lassoState === 'moving') { const delta = point.subtract(App.lassoPrevPoint); App.lassoItems.forEach(i => i.position = i.position.add(delta)); App.lassoPath.position = App.lassoPath.position.add(delta); App.lassoPrevPoint = point; updateLassoMenu(); } 
             updateLassoVisuals();
         }
-
         function handleLassoUp() { 
             if (App.lassoState === 'drawing') { 
-                App.lassoPath.closed = true; 
-                App.lassoPath.simplify(10); 
-                const geo = App.lassoPath; 
-                
-                App.lassoItems = ensurePaintLayer().children.filter(i => 
-                    !i.data.isLassoUI && 
-                    !i.data.isLaser && 
-                    !i.data.isEraserUI &&
-                    (geo.contains(i.bounds.center) || geo.intersects(i))
-                ); 
-                
-                if (App.lassoItems.length > 0) { 
-                    App.lassoState = 'selected'; 
-                    App.lassoPath.strokeColor = '#3B82F6';
-                    App.lassoPath.fillColor = new Color(0.23,0.51,0.96,0.05);
-                    updateLassoVisuals();
-                    
-                    showLassoMenu(App.lassoPath.bounds); 
-                } else { 
-                    clearLasso(); 
-                } 
-            } else if (App.lassoState === 'moving') { 
-                App.lassoState = 'selected'; 
-                History.saveState(); 
-            } 
+                App.lassoPath.closed = true; App.lassoPath.simplify(10); const geo = App.lassoPath; 
+                App.lassoItems = ensurePaintLayer().children.filter(i => !i.data.isLassoUI && !i.data.isLaser && !i.data.isEraserUI && (geo.contains(i.bounds.center) || geo.intersects(i))); 
+                if (App.lassoItems.length > 0) { App.lassoState = 'selected'; App.lassoPath.strokeColor = '#3B82F6'; App.lassoPath.fillColor = new Color(0.23,0.51,0.96,0.05); updateLassoVisuals(); showLassoMenu(App.lassoPath.bounds); } else { clearLasso(); } 
+            } else if (App.lassoState === 'moving') { App.lassoState = 'selected'; History.saveState(); } 
         }
-
-        function updateLassoVisuals() {
-            if (!App.lassoPath) return;
-            const scale = 1 / view.zoom;
-            App.lassoPath.strokeWidth = 2 * scale;
-            App.lassoPath.dashArray = [5 * scale, 5 * scale];
-        }
-
+        function updateLassoVisuals() { if (!App.lassoPath) return; const scale = 1 / view.zoom; App.lassoPath.strokeWidth = 2 * scale; App.lassoPath.dashArray = [5 * scale, 5 * scale]; }
         function clearLasso(saveBackup = false) { 
-            if (saveBackup && App.lassoState === 'selected') {
-                App.lassoBackup = {
-                    items: [...App.lassoItems], 
-                    pathData: App.lassoPath ? App.lassoPath.pathData : null,
-                    position: App.lassoPath ? App.lassoPath.position : null
-                };
-            } else if (!saveBackup) {
-                App.lassoBackup = null;
-            }
-
-            if(App.lassoPath) { App.lassoPath.remove(); App.lassoPath = null; } 
-            App.lassoItems = []; 
-            App.lassoState = 'idle'; 
-            document.getElementById('lasso-actions').classList.remove('visible'); 
+            if (saveBackup && App.lassoState === 'selected') { App.lassoBackup = { items: [...App.lassoItems], pathData: App.lassoPath ? App.lassoPath.pathData : null, position: App.lassoPath ? App.lassoPath.position : null }; } else if (!saveBackup) { App.lassoBackup = null; }
+            if(App.lassoPath) { App.lassoPath.remove(); App.lassoPath = null; } App.lassoItems = []; App.lassoState = 'idle'; document.getElementById('lasso-actions').classList.remove('visible'); 
         }
-
         function showLassoMenu(bounds) { const m = document.getElementById('lasso-actions'); const p = view.projectToView(bounds.topCenter); m.style.left = p.x + 'px'; m.style.top = (p.y - 10) + 'px'; m.classList.add('visible'); }
         function updateLassoMenu() { if(App.lassoPath) showLassoMenu(App.lassoPath.bounds); }
         function deleteSelection() { App.lassoItems.forEach(i => i.remove()); clearLasso(); History.saveState(); }
-        
-        function duplicateSelection() { 
-            const offset = new Point(20,20);
-            const newItems = [];
-            
-            App.lassoItems.forEach(i => { 
-                const c = i.clone(); 
-                c.position = c.position.add(offset); 
-                ensurePaintLayer().addChild(c); 
-                newItems.push(c);
-            }); 
-            
-            App.lassoItems = newItems;
-            if(App.lassoPath) {
-                App.lassoPath.position = App.lassoPath.position.add(offset);
-                App.lassoPath.bringToFront();
-                updateLassoMenu();
-            }
-            
-            History.saveState(); 
-        }
+        function duplicateSelection() { const offset = new Point(20,20); const newItems = []; App.lassoItems.forEach(i => { const c = i.clone(); c.position = c.position.add(offset); ensurePaintLayer().addChild(c); newItems.push(c); }); App.lassoItems = newItems; if(App.lassoPath) { App.lassoPath.position = App.lassoPath.position.add(offset); App.lassoPath.bringToFront(); updateLassoMenu(); } History.saveState(); }
 
         function updateSubToolbar() {
             const el = document.getElementById('sub-toolbar'); el.innerHTML = '';
             if (App.mode === 'pen') {
                 const g = document.createElement('div'); g.className='opt-group';
-                // [New] Switch type -> Update Settings -> Re-render subtoolbar to show new values
                 [{id:'fountain',t:'鋼筆'}, {id:'ballpoint',t:'圓珠筆'}, {id:'highlighter',t:'螢光筆'}].forEach(o=>{ const d=document.createElement('div'); d.className=`opt-btn ${App.penType===o.id?'selected':''}`; d.innerText=o.t; d.onclick=()=>{ App.penType=o.id; ToolSettings.apply(o.id); ToolSettings.save(); updateSubToolbar(); }; g.appendChild(d); }); el.appendChild(g);
-                
                 const modeG = document.createElement('div'); modeG.className='opt-group';
                 [{id:'free',t:'曲線'}, {id:'line',t:'直線'}].forEach(o=>{ const d=document.createElement('div'); d.className=`opt-btn ${App.penDrawMode===o.id?'selected':''}`; d.innerText=o.t; d.onclick=()=>{ App.penDrawMode=o.id; ToolSettings.save(); updateSubToolbar();}; modeG.appendChild(d); }); el.appendChild(modeG);
-
                 const cw = document.createElement('div'); cw.className='setting-item'; cw.innerHTML=`<div id="color-trigger-btn" class="color-trigger" style="background:${App.strokeColor}"></div>`; cw.onclick = (e) => { e.stopPropagation(); toggleColorPopover(); }; el.appendChild(cw);
-                
-                const sliderGroup = document.createElement('div');
-                sliderGroup.className = 'slider-group';
-                addSlider(sliderGroup,'粗細',1,40,App.strokeWidth,v=>{App.strokeWidth=v; ToolSettings.save();}); 
-                addSlider(sliderGroup,'透明度',1,100,App.strokeOpacity*100,v=>{App.strokeOpacity=v/100; ToolSettings.save();});
-                el.appendChild(sliderGroup);
-
+                const sliderGroup = document.createElement('div'); sliderGroup.className = 'slider-group';
+                addSlider(sliderGroup,'粗細',1,40,App.strokeWidth,v=>{App.strokeWidth=v; ToolSettings.save();}); addSlider(sliderGroup,'透明度',1,100,App.strokeOpacity*100,v=>{App.strokeOpacity=v/100; ToolSettings.save();}); el.appendChild(sliderGroup);
             } else if (App.mode.startsWith('eraser')) {
                 const g=document.createElement('div'); g.className='opt-group';
                 [{id:'standard',t:'擦部分'}, {id:'object',t:'擦整條'}].forEach(o=>{ const d=document.createElement('div'); d.className=`opt-btn ${App.eraserMode===o.id?'selected':''}`; d.innerText=o.t; d.onclick=()=>{App.eraserMode=o.id; ToolSettings.save(); updateSubToolbar();}; g.appendChild(d); }); el.appendChild(g);
                 if(App.mode==='eraser') addSlider(el,'大小',5,100,App.eraserSize,v=>{App.eraserSize=v; ToolSettings.save();});
-            } else if (App.mode === 'lasso') {
-                el.innerHTML = '<span style="color:#64748B;font-size:12px">圈選後可移動、複製或刪除</span>';
-            } else if (App.mode === 'laser') {
-                el.innerHTML = '<span style="color:#64748B;font-size:12px">停止書寫 0.8 秒後軌跡自動消失</span>';
-            }
+            } else if (App.mode === 'lasso') { el.innerHTML = '<span style="color:#64748B;font-size:12px">圈選後可移動、複製或刪除</span>'; } else if (App.mode === 'laser') { el.innerHTML = '<span style="color:#64748B;font-size:12px">停止書寫 0.8 秒後軌跡自動消失</span>'; }
         }
         function addSlider(p,l,min,max,v,cb){ const w=document.createElement('div'); w.className='setting-item'; w.innerHTML=`<span style="font-size:12px">${l}</span><input type="range" min="${min}" max="${max}" value="${v}">`; w.querySelector('input').oninput=(e)=>cb(parseInt(e.target.value)); p.appendChild(w); }
 
         function startGesture() { 
-            App.isGesturing = true; 
-            if(App.currentPath){App.currentPath.remove();App.currentPath=null;} 
-            
-            // Cleanup Eraser UI
+            App.isGesturing = true; if(App.currentPath){App.currentPath.remove();App.currentPath=null;} 
             if(App.eraserPreview) { App.eraserPreview.remove(); App.eraserPreview = null; }
             if(App.rectPath) { App.rectPath.remove(); App.rectPath = null; }
-
-            // [FIX] REVERT ERASER DAMAGE IF GESTURE STARTED
-            if (App.mode === 'eraser' && App.backupLayerJSON) {
-                const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer;
-                paintLayer.removeChildren();
-                paintLayer.importJSON(App.backupLayerJSON);
-                App.backupLayerJSON = null;
-            }
-
-            const p=Array.from(App.activePointers.values()); 
-            App.prevDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); 
-            App.prevC={x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2};
-            
+            if (App.mode === 'eraser' && App.backupLayerJSON) { const paintLayer = project.layers.find(l => l.name === 'paint') || project.activeLayer; paintLayer.removeChildren(); paintLayer.importJSON(App.backupLayerJSON); App.backupLayerJSON = null; }
+            const p=Array.from(App.activePointers.values()); App.prevDist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); App.prevC={x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2};
             document.getElementById('lasso-actions').classList.remove('visible');
-
-            if (App.mode === 'laser' && App.activeLaserTrail) {
-                const idx = App.laserTrails.indexOf(App.activeLaserTrail);
-                if (idx > -1) App.laserTrails.splice(idx, 1);
-                if (App.activeLaserTrail.pathGlow) App.activeLaserTrail.pathGlow.remove();
-                if (App.activeLaserTrail.pathCore) App.activeLaserTrail.pathCore.remove();
-                App.activeLaserTrail = null;
-            }
-
+            if (App.mode === 'laser' && App.activeLaserTrail) { const idx = App.laserTrails.indexOf(App.activeLaserTrail); if (idx > -1) App.laserTrails.splice(idx, 1); if (App.activeLaserTrail.pathGlow) App.activeLaserTrail.pathGlow.remove(); if (App.activeLaserTrail.pathCore) App.activeLaserTrail.pathCore.remove(); App.activeLaserTrail = null; }
             if (App.mode === 'lasso') {
                 if (App.lassoState === 'drawing') {
                     if (App.lassoPath) { App.lassoPath.remove(); App.lassoPath = null; }
-                    if (App.lassoBackup) {
-                        App.lassoItems = App.lassoBackup.items;
-                        App.lassoPath = new Path({
-                            pathData: App.lassoBackup.pathData,
-                            strokeColor: '#3B82F6',
-                            fillColor: new Color(0.23,0.51,0.96,0.05),
-                            data: { isLassoUI: true }
-                        });
-                        App.lassoPath.position = App.lassoBackup.position;
-                        App.lassoState = 'selected';
-                        updateLassoVisuals();
-                    } else {
-                        App.lassoState = 'idle';
-                    }
-                } else if (App.lassoState === 'moving') {
-                     App.lassoState = 'selected';
-                }
+                    if (App.lassoBackup) { App.lassoItems = App.lassoBackup.items; App.lassoPath = new Path({ pathData: App.lassoBackup.pathData, strokeColor: '#3B82F6', fillColor: new Color(0.23,0.51,0.96,0.05), data: { isLassoUI: true } }); App.lassoPath.position = App.lassoBackup.position; App.lassoState = 'selected'; updateLassoVisuals(); } else { App.lassoState = 'idle'; }
+                } else if (App.lassoState === 'moving') { App.lassoState = 'selected'; }
             }
         }
         function handleGesture() { 
             const p=Array.from(App.activePointers.values()); const dist=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y); const c={x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2}; 
             if(App.prevDist>0){ 
-                let s=dist/App.prevDist; 
-                
-                if (view.zoom * s < 0.01) s = 0.01 / view.zoom;
-
-                const p1=view.viewToProject(new Point(App.prevC.x,App.prevC.y)); 
-                view.scale(s,p1); 
-                view.center=view.center.add(p1.subtract(view.viewToProject(new Point(c.x,c.y)))); 
-                
-                updateZoomToast();
+                let s=dist/App.prevDist; if (view.zoom * s < 0.01) s = 0.01 / view.zoom;
+                const p1=view.viewToProject(new Point(App.prevC.x,App.prevC.y)); view.scale(s,p1); view.center=view.center.add(p1.subtract(view.viewToProject(new Point(c.x,c.y)))); updateZoomToast();
             } 
-            App.prevDist=dist; App.prevC=c; 
-            updateLassoVisuals(); 
-            if(App.eraserPreview) App.eraserPreview.strokeWidth=1/view.zoom; 
+            App.prevDist=dist; App.prevC=c; updateLassoVisuals(); if(App.eraserPreview) App.eraserPreview.strokeWidth=1/view.zoom; 
         }
         function onWheel(e) { 
-            e.preventDefault(); 
-            let z = e.deltaY>0?1/1.05:1.05; 
-            
-            if (view.zoom * z < 0.01) z = 0.01 / view.zoom;
-
-            view.scale(z, view.viewToProject(new Point(e.clientX, e.clientY))); 
-            
-            updateZoomToast();
-
-            updateLassoVisuals();
-            updateLassoMenu(); 
+            e.preventDefault(); let z = e.deltaY>0?1/1.05:1.05; if (view.zoom * z < 0.01) z = 0.01 / view.zoom;
+            view.scale(z, view.viewToProject(new Point(e.clientX, e.clientY))); updateZoomToast(); updateLassoVisuals(); updateLassoMenu(); 
         }
 
     </script>
